@@ -1,0 +1,633 @@
+/* --------------------------------------- Connecting Arduino To Gtalk -----------------------------------
+
+    
+    +---------+           +------------+             +--------------+           +------------------------+         +---------+
+    | Arduino | =+-----+= | Processing | =+-----+=   | Gtalk Server | =+-----+= | Android  |  processing | =-----= | Arduino |
+    +---------+           +------------+             +--------------+           +------------------------+         +---------+
+    
+ 
+ Features :
+ --------------------------------------------------------------
+ a) End to end arduino connectivity
+ b) infinite number of arduino's can be connected
+ c) remote arduino control
+ d) no ethernet shield is required
+ e) maximum security since using GTALK [ private tunnelling ] 
+ f) ACK with image address can also be used 
+ h) freely available source code
+ 
+ About Author :
+ -----------------------
+ Date   : 24 - JUL - 2013
+ Author : Naganand V
+ Build  : Processing IDE
+ Blog   : www.electronuters.weebly.com
+ 
+ Sincere Regards who has built all the libraries i have used..
+ ---------------------------------------------------------------------------------------------------*/
+
+/* -----------------------------  Import all wanted libraries -----------------------*/
+import controlP5.*; // library for GUI
+import ddf.minim.*; // library for audio playing or voice ack
+import guru.ttslib.*; // text to speech conversion
+import processing.serial.*; // serial communication library
+//import cc.arduino.*; // arduino firmata library
+//import jabberlib.*; // XAMPP Chat Creating Library
+import fullscreen.*; // Full Screen Support package
+
+// Wake up UI as cp5
+ControlP5 cp5;
+// wake up Main Arduino heading as myText1labelA
+Textlabel myTextlabelA;
+// wake up Digital signal processor as minim 
+Minim minim;
+// wake up arduino using name as arduino and using standard firmata library
+//Arduino arduino;
+// wake up text to speech converting library
+TTS tts;
+// wake up a GTalk robot called spooky
+//Jabber spooky;
+// wake up full screen manager as fs
+SoftFullScreen fs;
+// wake my large text area on screen as myTextarea
+Textarea myTextarea;
+
+/* -----------------------------  Audio playable samples -----------------------*/
+AudioSample welcome, init;                          // locally stored audio files
+AudioSample arduino_fan_off, arduino_fan_on;        // arduino audio files
+AudioSample cpu_fan_on , cpu_fan_off;               // cpu fan audio files
+AudioSample modem_on  , modem_off;                  // modem audio files 
+AudioSample speaker_on  , speaker_off;              // Speaker audio files
+AudioSample warning_temp_arduino, warning_temp_cpu; // warning audio files 
+AudioSample normal_temp_cpu, normal_temp_arduino;             // normal temp attained audio files 
+AudioSample appliance_1_on, appliance_1_off;        
+AudioSample appliance_2_on, appliance_2_off;        // appliance 1-4 audio files
+AudioSample appliance_3_on, appliance_3_off;
+AudioSample appliance_4_on, appliance_4_off;
+
+/* -----------------------------  variables to hold values -----------------------*/
+// Floating point variables
+public float state;            // hold tru or fal
+public float tru = 1.0; 
+public float fal = 0.0;
+public float modem_state;
+// Integer Variables 
+public int normal_temp = 25; // perefct temp
+public int time_min;         // hold minuted
+public int time_hr;          // hold hour
+public int pot_var;          // potentiometer variable
+//public int modem_pin = 13;
+// String type variables
+public String prev_message;  // jabber previous message
+public String new_message;
+public String pot_value;     // potentiometer value
+public boolean pass_state = false;// 1st make it false
+public String textValue = "";// store chat message
+
+/* -----------------------------  Start the basic setup of GUI -----------------------*/
+void setup() {
+
+  size(1360, 768);                      // Set Screen Resolution Of 1360x768
+  frameRate(5);                         // set frame per second rate
+  smooth();
+  PFont font = createFont("arial", 20); // create a text font
+
+  fs = new SoftFullScreen(this);        // Create the fullscreen object 
+  fs.enter();                           // enter fullscreen mode
+   
+  cp5    = new ControlP5(this);         // constructor for GUI
+  minim  = new Minim(this);             // constructor for audio playback
+  tts    = new TTS();                   // constructor for text to speech converter
+
+  // spooky = new Jabber(this, "talk.google.com", 5222, "gmail.com"); // create a chat agent called spooky 
+  // spooky.login("vnaganandhome@gmail.com", "****************");     // login to gtalk server i.e client side login ("MAIL_ID","PASSWORD"); 
+  //  Object[] users = spooky.getUsers();                             // get friends from gtalk
+  // spooky.createChat("naganandhomeserver@gmail.com");               // create chat channel with specified user
+
+                init   = minim.loadSample( "intializing.mp3", 512);       // filename, buffersize
+                //init.trigger();
+                //delay(3000); 
+             welcome   = minim.loadSample( "welcome.mp3", 512); 
+               //welcome.trigger();
+       arduino_fan_off = minim.loadSample( "arduinofanoff.mp3", 512); // sound that stores in buffer to play  [  ARDUINO FAN OFF ]
+       arduino_fan_on  = minim.loadSample( "arduinofanon.mp3", 512);  // [ ARDUINO FAN ON ]
+           cpu_fan_off = minim.loadSample( "cpu_fan_off.mp3", 512);     // [ CPU FAN OFF ]
+           cpu_fan_on  = minim.loadSample( "cpu_fan_on.mp3", 512);      // [ CPU FAN ON ]
+             modem_on  = minim.loadSample( "modem_on.mp3", 512);       // [ MODEM ON ] 
+             modem_off = minim.loadSample( "modem_off.mp3", 512);      // [ MODEM OFF ]
+           speaker_on  = minim.loadSample( "speakeron.mp3", 512);     // [ SPEAKER ON ]
+           speaker_off = minim.loadSample( "speakeroff.mp3", 512);    // [ SPEAKER OFF ]
+  warning_temp_cpu     = minim.loadSample( "warning_temp_cpu.mp3", 512);    // [ WARNING TEMPERATURE MESSAGE CPU ]  
+  warning_temp_arduino = minim.loadSample( "warning_temp_arduino.mp3", 512);    // [ WARNING TEMPERATURE MESSAGE ARDUINO ] 
+  normal_temp_arduino  = minim.loadSample( "normal_temp_arduino.mp3", 512);     // [ NORMAL TEMPERATURE MESSAGE ARDUINO ] 
+  normal_temp_cpu      = minim.loadSample( "normal_temp_cpu.mp3", 512);     // [ NORMAL TEMPERATURE MESSAGE CPU ]
+       appliance_1_on  = minim.loadSample( "appliance_1_on.mp3", 512);        // [ APPLIANCE 1 ON ]
+       appliance_2_on  = minim.loadSample( "appliance_2_on.mp3", 512);
+       appliance_3_on  = minim.loadSample( "appliance_3_on.mp3", 512);
+       appliance_4_on  = minim.loadSample( "appliance_4_on.mp3", 512);
+       appliance_1_off = minim.loadSample( "appliance_1_off.mp3", 512);       //[ APPLIANCE 1 OFF ]
+       appliance_2_off = minim.loadSample( "appliance_2_off.mp3", 512);
+       appliance_3_off = minim.loadSample( "appliance_3_off.mp3", 512);
+       appliance_4_off = minim.loadSample( "appliance_4_off.mp3", 512);
+
+  //Create the main label 
+  myTextlabelA = cp5.addTextlabel("label")
+    .setText("Arduino Control Panel")
+      .setPosition(450, 10)
+        .setColorValue(0xffffffff)
+          .setFont(createFont("Georgia", 40))
+            ;
+
+  // create a toggle switch " Speaker" and change the default look to a (on/off) switch look
+  cp5.addToggle("Speaker")
+    .setPosition(50, 50)
+      .setSize(100, 40)
+        .setValue(false)
+          .setMode(ControlP5.SWITCH)
+            .setId(1);
+  ;
+  // create a toggle switch " Modem" and change the default look to a (on/off) switch look
+  cp5.addToggle("Modem")
+    .setPosition(50, 150)
+      .setSize(100, 40)
+        .setValue(false) // set initial value as false
+          .setMode(ControlP5.SWITCH)
+            .setId(2)   // set unique identification number as 2
+              ;
+  // create a toggle switch " CPU_Fan" and change the default look to a (on/off) switch look
+  cp5.addToggle("CPU_Fan")
+    .setPosition(50, 250)
+      .setSize(100, 40)
+        .setValue(false)
+          .setMode(ControlP5.SWITCH)
+            .setId(3)
+              ;
+  // create a toggle switch " Arduino_Fan " and change the default look to a (on/off) switch look
+  cp5.addToggle("Arduino_Fan")
+    .setPosition(50, 350)
+      .setSize(100, 40)
+        .setValue(false)
+          .setMode(ControlP5.SWITCH)
+            .setId(4)
+              ;
+			  
+  cp5.addToggle("Appliance1")
+    .setPosition(200, 50)
+      .setSize(100, 40)
+        .setValue(false)
+          .setMode(ControlP5.SWITCH)
+            .setId(8);
+             ;
+
+  cp5.addToggle("Appliance2")
+     .setPosition(200, 150)
+       .setSize(100, 40)
+         .setValue(false)
+           .setMode(ControlP5.SWITCH)
+             .setId(9);
+  ;
+
+  cp5.addToggle("Appliance3")
+    .setPosition(200, 250)
+      .setSize(100, 40)
+        .setValue(false)
+          .setMode(ControlP5.SWITCH)
+            .setId(10);
+  ;
+
+  cp5.addToggle("Appliance4")
+    .setPosition(200, 350)
+      .setSize(100, 40)
+        .setValue(false)
+          .setMode(ControlP5.SWITCH)
+            .setId(11);
+  ;
+  //  Create a Potentiometer " RED " and change the value of pot by varying the knob
+  cp5.addKnob("Red")
+    .setRange(0, 255) // Min and Max values of the pot
+      .setValue(0)    // set initial value as 0 
+        .setPosition(400, 120)
+          .setRadius(75) // set the radius in pixels
+            .setDragDirection(Knob.HORIZONTAL) // dragging or changing value direction using mouse pointer
+              .setId(5)
+                ;
+  //  Create a Potentiometer " GREEN " and change the value of pot by varying the knob
+  cp5.addKnob("Green")
+    .setRange(0, 255)
+      .setValue(0)
+        .setPosition(580, 120)
+          .setRadius(75)
+            .setDragDirection(Knob.HORIZONTAL)
+              .setId(6)
+                ;
+  //  Create a Potentiometer " BLUE " and change the value of pot by varying the knob
+  cp5.addKnob("Blue")
+    .setRange(0, 255)
+      .setValue(0)
+        .setPosition(760, 120)
+          .setRadius(75)
+            .setDragDirection(Knob.HORIZONTAL)
+              .setId(7)
+                ;
+  // Create a slider which shows the temperature of CPU 
+  cp5.addSlider("CPU_Temperature") // slider named
+    .setPosition(1000, 50) 
+      .setSize(100, 350) // length and breadth of slider
+        .setRange(0, 100) // MIN and MAX range of slider
+          .setNumberOfTickMarks(10) // Increment or divisional value of slider
+            ;
+  // Create a slider which shows the temperature of Arduino
+  cp5.addSlider("Arduino_Temperature")
+    .setPosition(1150, 50)
+      .setSize(100, 350)
+        .setRange(0, 100)
+          .setNumberOfTickMarks(10)
+            ;
+  cp5.addBang("Pause")
+    .setPosition(1000, 450)
+      .setSize(250, 20);
+  cp5.getController("Pause").setBehavior(new TimedEvent());
+
+  
+
+   cp5.addTextfield("Text_Command")
+    .setPosition(50, 460)
+      .setSize(250, 30)
+        .setFont(createFont("arial", 15))
+          .setAutoClear(false)
+            ;
+
+  cp5.addBang("Submit")
+    .setPosition(350, 430)
+      .setSize(80, 30)
+        .getCaptionLabel().align(ControlP5.CENTER, ControlP5.CENTER)
+          ;
+
+  cp5.addBang("Clear")
+    .setPosition(350, 500)
+      .setSize(80, 30)
+        .getCaptionLabel().align(ControlP5.CENTER, ControlP5.CENTER)
+          ;
+
+  myTextarea = cp5.addTextarea("txt")
+    .setPosition(50, 550)
+      .setSize(1250, 190)
+        .setFont(createFont("arial", 20))
+          .setLineHeight(14)
+            .setColor(color(255))
+              .setColorBackground(color(255, 100))
+                .setColorForeground(color(255, 100));
+  ;
+
+  myTextarea.setText("\n  Speaker : "+"                                   " + "Appliance1 : " + "\n\n\n"
+    + "  Modem  :                                    Appliance2 : " + "\n\n\n"
+    + "CPU_Fan :                                    Appliance3 : " + "\n\n\n"
+    + "ARD_Fan :                                    Appliance4 : "
+    ); 
+
+
+  cp5.getTooltip().setDelay(500);
+  cp5.getTooltip().register("Speaker", "Changes the status of the Speaker."); // cp5.getTooltip().register("Object","Tool_Tip_String");
+  cp5.getTooltip().register("Modem", "Changes the status of the Modem.");
+  cp5.getTooltip().register("CPU_Fan", "Changes the status of the CPU_Cooling_fan.");
+  cp5.getTooltip().register("Arduino_Fan", "Changes the status of the Arduino_Cooling_Fan.");
+  cp5.getTooltip().register("Arduino_Temperature", "Current temperature of Arduino.");
+  cp5.getTooltip().register("CPU_Temperature", "Current temperature of CPU.");
+  cp5.getTooltip().register("Appliance1", "Changes the status of the Appliance1.");
+  cp5.getTooltip().register("Appliance2", "Changes the status of the Appliance2.");
+  cp5.getTooltip().register("Appliance3", "Changes the status of the Appliance3.");
+  cp5.getTooltip().register("Appliance4", "Changes the status of the Appliance4.");
+  //println(Arduino.list());
+  //arduino = new Arduino(this, Arduino.list()[2], 57600);
+  //arduino.pinMode(modem_pin, Arduino.OUTPUT);
+}
+
+
+void draw() {
+
+  background(0);
+  time_min = minute(); // store current minute value in time
+  time_hr = hour(); // store hours
+
+  modem_state = cp5.getController("Modem").getValue(); // get current status of modem
+
+  if (time_hr == 22 && time_min == 20 && modem_state == fal) // if Morning 2:20 AM and present state of modem is off
+  {
+    cp5.getController("Modem").setValue(tru); // then on the modem
+  }
+  else if (time_hr == 22 && time_min == 21 && modem_state == tru) // else if time is 8:00 AM and modem is still on
+  {
+    cp5.getController("Modem").setValue(fal); // switch off modem
+  }
+}
+
+ //incoming chat message are forwarded to the chatEvent method and it is connected with chat server
+ void chatEvent(String message) {
+ println("received message: "+message);
+ if ( message != null)
+ { 
+ new_message = message;
+ compare_string();
+ }
+ 
+ }
+
+void controlEvent(ControlEvent c) {
+  /* ----------------- If control event is from text box -------------- */
+  if (c.isAssignableFrom(Textfield.class)) {
+    Textfield t = (Textfield)c.getController();
+    textValue = t.stringValue();
+    pass_state = true; // pass message showing that message is coming from GTALK
+    chatEvent(textValue);
+    pass_state = false; // close the GTALK Portal for security purpose
+  }
+  /* ----------------- close control event from text box -------------- */
+  switch(c.getId()) 
+  {
+  /* ------------  Speaker Controller ------------- */  
+  case 1 : 
+    state = c.getValue(); // get current status
+    if (state == tru)
+    {
+      speaker_on.trigger();
+    }
+    else
+    {
+      speaker_off.trigger();
+    }
+    break;
+  /* ------------  Modem Controller ------------- */
+  case 2 : 
+    state = c.getValue();
+    if (state == tru)
+    {
+      modem_on.trigger();
+      //arduino.digitalWrite(modem_pin, Arduino.HIGH);
+    }
+    else
+    {
+      modem_off.trigger();
+      //arduino.digitalWrite(modem_pin, Arduino.LOW);
+    }
+    break;
+  /* ------------ CPU Cooling Fan Controller ------------- */
+  case 3 : 
+    state =  c.getValue();
+    if (state == tru)
+    {
+      cpu_fan_on.trigger();
+    }
+    else
+    {
+      cpu_fan_off.trigger();
+    }
+    break;
+  /* ------------ Arduino Cooling Fan Controller ------------- */  
+  case 4 : 
+    state =   c.getValue();
+    if (state == tru)
+    {
+      arduino_fan_on.trigger();
+    }
+    else
+    {
+      arduino_fan_off.trigger();
+    }
+    break;
+  /* ------------  Red Pot Value Controller ------------- */
+  case 5 : 
+    pot_var = floor(c.getValue());
+    pot_value = str(pot_var); // convert float to string
+    tts.speak("Red pot set to "); // text to speech convert string " Say that RED POT IS SET To "
+    tts.speak(pot_value); // say the present value of red pot
+    break;
+ /* ------------  Green Pot Value Controller ------------- */
+  case 6 :
+    pot_var = floor(c.getValue());
+    pot_value = str(pot_var);
+    tts.speak("Green pot set to ");
+    tts.speak(pot_value); 
+    break;
+  /* ------------  Blue Pot Value Controller ------------- */
+  case 7 :
+    pot_var = floor(c.getValue());
+    pot_value = str(pot_var);
+    tts.speak("Blue pot set to ");
+    tts.speak(pot_value);  
+    break;
+ /* ------------ Appliance 1 Controller ------------- */
+  case 8 : 
+    state =   c.getValue();
+    if (state == tru)
+    {
+      appliance_1_on.trigger();
+    }
+    else
+    {
+      appliance_1_off.trigger();
+    }
+    break;
+  /* ------------ Appliance 2 Controller ------------- */
+  case 9 : 
+    state =   c.getValue();
+    if (state == tru)
+    {
+      appliance_2_on.trigger();
+    }
+    else
+    {
+      appliance_2_off.trigger();
+    }
+    break;
+  /* ------------ Appliance 3 Controller ------------- */
+  case 10 : 
+    state =   c.getValue();
+    if (state == tru)
+    {
+      appliance_3_on.trigger();
+    }
+    else
+    {
+      appliance_3_off.trigger();
+    }
+    break;
+  /* ------------ Appliance 4 Controller ------------- */
+  case 11 : 
+    state =   c.getValue();
+    if (state == tru)
+    {
+      appliance_4_on.trigger();
+    }
+    else
+    {
+      appliance_4_off.trigger();
+    }
+    break;
+  }// close switch()
+}// close controlEvent()
+
+/* --------------- For Text Clearing -------------- */
+public void Clear() {
+  cp5.get(Textfield.class, "Text_Command").clear();
+}
+
+/* --------------- For Text Submitting -------------- */
+void submit(int theValue) {
+  myTextfield.submit();
+}
+
+
+public void Pause() {
+
+  float present_cpu_state;
+  float present_ard_state;
+
+  present_cpu_state =  cp5.getController("CPU_Fan").getValue();
+  present_ard_state =  cp5.getController("Arduino_Fan").getValue();
+
+  int cputemp = (int) random(1, 1); // read CPU temperature
+  int ardtemp = (int) random(1, 1); // Reas Arduino Temperature
+
+  if ( cputemp >= 50) // if CPU temperature above normal, On the cooling fan
+  {
+    if (present_cpu_state == fal)
+    {
+      warning_temp_cpu.trigger();
+      delay(7000);
+      cp5.getController("CPU_Fan").setValue(tru);
+    }
+  }
+  else if ( ardtemp >= 32) // if Arduino temperature above normal , On the cooling the fan
+  {
+    if (present_ard_state == fal)
+    {
+      warning_temp_arduino.trigger();
+      delay(7000);
+      cp5.getController("Arduino_Fan").setValue(tru);
+    }
+  }
+  else if (ardtemp <= normal_temp) // if Arduino temperature becomes normal, off the fan
+  {
+    if (present_ard_state == tru) // check if present state is on
+    {
+      normal_temp_arduino.trigger();
+      delay(5000);
+      cp5.getController("Arduino_Fan").setValue(fal);
+    }
+  }
+  else if (cputemp <= normal_temp)
+  {
+    if (present_cpu_state == tru)
+    {
+      normalcpu.trigger();
+      delay(5000);
+      cp5.getController("CPU_Fan").setValue(fal);
+    }
+  }
+
+  cp5.getController("CPU_Temperature").setValue(cputemp); // set the slider value according to data from arduino temp sensors
+  cp5.getController("Arduino_Temperature").setValue(ardtemp);
+}
+
+// custom ControlBehavior
+class TimedEvent extends ControlBehavior {
+  long myTime;
+  int interval = 10000;
+
+  public TimedEvent() { 
+    reset();
+  }
+  void reset() { 
+    myTime = millis() + interval;
+  }
+
+  public void update() {
+    if (millis()>myTime) { 
+      setValue(1); 
+      reset();
+    }
+  }
+}
+
+void compare_string()
+ {
+ String value = new_message; // store temp string
+ if ( value != null) // if string contains something
+ {
+ if ( value != prev_message ) // if string is not same as previous
+ {
+ // Send Wake Up Signal 
+ if ("wake".equals(value )) { // if string equals to wake
+ println("waked up");
+ //spooky.sendMessage("waked up");
+ //spooky.sendMessage("Please provide password Authentication :");
+ }
+ // Authenticate for password
+ if ("letmein".equals(value )) {
+ println("password accepted");
+ //spooky.sendMessage("password accepted");
+ pass_state = true; // set password correct state true
+ }
+ /* ----------------- Speaker Control -------------- */
+ if ("speaker_on".equals(value ) && pass_state == true) { // if string equals to speaker_on
+ //spooky.sendMessage("speaker turned on");
+ cp5.getController("Speaker").setValue(tru);
+ }
+ if ("speaker_off".equals(value ) && pass_state == true) {
+ //spooky.sendMessage("speaker turned off");
+ cp5.getController("Speaker").setValue(fal);
+ }
+ /* ----------------- Modem Control -------------- */
+ if ("mdmon".equals(value ) && pass_state == true) {  // if string equals to mdmon [ MODEM ON ] 
+ //spooky.sendMessage("modem turned on");
+ cp5.getController("Modem").setValue(tru);
+ }
+ if ("mdmoff".equals(value ) && pass_state == true) {
+ //spooky.sendMessage("modem turned off");
+ cp5.getController("Modem").setValue(fal);
+ }
+ /* ----------------- Appliance1 Control -------------- */
+  if ("appliance_1_on".equals(value ) && pass_state == true) {
+ //spooky.sendMessage("Appliance1 turned On");
+ cp5.getController("Appliance1").setValue(tru);
+ }
+  if ("appliance_1_off".equals(value ) && pass_state == true) {
+ //spooky.sendMessage("Appliance1 turned Off");
+ cp5.getController("Appliance1").setValue(fal);
+ }
+ /* ----------------- Appliance2 Control -------------- */
+  if ("appliance_2_on".equals(value ) && pass_state == true) {
+ //spooky.sendMessage("Appliance2 turned On");
+ cp5.getController("Appliance2").setValue(tru);
+ }
+  if ("appliance_2_off".equals(value ) && pass_state == true) {
+ //spooky.sendMessage("Appliance2 turned Off");
+ cp5.getController("Appliance2").setValue(fal);
+ }
+ /* ----------------- Appliance3 Control -------------- */
+  if ("appliance_3_on".equals(value ) && pass_state == true) {
+ //spooky.sendMessage("Appliance3 turned On");
+ cp5.getController("Appliance3").setValue(tru);
+ }
+  if ("appliance_3_off".equals(value ) && pass_state == true) {
+ //spooky.sendMessage("Appliance3 turned Off");
+ cp5.getController("Appliance3").setValue(fal);
+ }
+ /* ----------------- Appliance4 Control -------------- */
+  if ("appliance_4_on".equals(value ) && pass_state == true) {
+ //spooky.sendMessage("Appliance4 turned On");
+ cp5.getController("Appliance4").setValue(tru);
+ }
+  if ("appliance_4_off".equals(value ) && pass_state == true) {
+ //spooky.sendMessage("Appliance4 turned Off");
+ cp5.getController("Appliance4").setValue(fal);
+ }
+ /* ----------------- Close App Control -------------- */
+ if ("shutdown".equals(value )) {
+ //spooky.sendMessage("turning off");
+ pass_state = false; // close gtalk chat
+ }
+ 
+ }
+ }
+ }
